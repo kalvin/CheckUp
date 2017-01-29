@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#BD2650</color>
+    <color name="colorPrimaryDark">#90193A</color>
+    <color name="colorAccent">#BC204B</color>
+    <color name="menu_item_color">#EEEFEE</color>
+    <color name="menu_text_color">#2C2A29</color>
+</resources>
