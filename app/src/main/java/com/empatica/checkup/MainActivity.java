@@ -7,17 +7,26 @@ import android.bluetooth.BluetoothDevice;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.design.widget.TabLayout;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.view.ViewPager;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,6 +38,14 @@ import com.empatica.empalink.config.EmpaSensorType;
 import com.empatica.empalink.config.EmpaStatus;
 import com.empatica.empalink.delegate.EmpaDataDelegate;
 import com.empatica.empalink.delegate.EmpaStatusDelegate;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.Legend;
+import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.utils.ColorTemplate;
 
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -40,29 +57,21 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 
+
 public class MainActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener, EmpaDataDelegate, EmpaStatusDelegate  {
+        implements NavigationView.OnNavigationItemSelectedListener  {
 
-    private static final int REQUEST_ENABLE_BT = 1;
-    private static final int REQUEST_PERMISSION_ACCESS_COARSE_LOCATION = 1;
+    private SectionsPagerAdapter mSectionsPagerAdapter;
+    private ViewPager mViewPager;
 
-    private static final long STREAMING_TIME = 100000; // Stops streaming 10 seconds after connection
 
-    private static final String EMPATICA_API_KEY = "1482f602113740c0aac7310e724e3a92"; // TODO insert your API Key here
+    public LineChart mChart1;
+    public LineChart mChart2;
+    public LineChart mChart3;
+    public LineChart mChart4;
 
-    private EmpaDeviceManager deviceManager = null;
+    private float hrData =0;
 
-    private TextView accel_xLabel;
-    private TextView accel_yLabel;
-    private TextView accel_zLabel;
-    private TextView bvpLabel;
-    private TextView edaLabel;
-    private TextView ibiLabel;
-    private TextView temperatureLabel;
-    private TextView batteryLabel;
-    private TextView statusLabel;
-    private TextView deviceNameLabel;
-    private RelativeLayout dataCnt;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,21 +98,125 @@ public class MainActivity extends AppCompatActivity
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        // Initialize vars that reference UI components
-        statusLabel = (TextView) findViewById(R.id.status);
-        dataCnt = (RelativeLayout) findViewById(R.id.dataArea);
-        accel_xLabel = (TextView) findViewById(R.id.accel_x);
-        accel_yLabel = (TextView) findViewById(R.id.accel_y);
-        accel_zLabel = (TextView) findViewById(R.id.accel_z);
-        bvpLabel = (TextView) findViewById(R.id.bvp);
-        edaLabel = (TextView) findViewById(R.id.eda);
-        ibiLabel = (TextView) findViewById(R.id.ibi);
-        temperatureLabel = (TextView) findViewById(R.id.temperature);
-        batteryLabel = (TextView) findViewById(R.id.battery);
-        deviceNameLabel = (TextView) findViewById(R.id.deviceName);
+        mSectionsPagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
 
-        initEmpaticaDeviceManager();
+        // Set up the ViewPager with the sections adapter.
+        mViewPager = (ViewPager) findViewById(R.id.container);
+        mViewPager.setAdapter(mSectionsPagerAdapter);
+        mViewPager.setOffscreenPageLimit((mSectionsPagerAdapter.getCount() > 1 ? mSectionsPagerAdapter.getCount() - 1 : 1));
+
+        TabLayout tabLayout = (TabLayout) findViewById(R.id.tabs);
+        tabLayout.setupWithViewPager(mViewPager);
+
+        mChart1 = new LineChart(this);
+        mChart1 = createGraph(mChart1, "BVP");
+
+        mChart2 = new LineChart(this);
+        mChart2 = createGraph(mChart2, "EDA");
+
+        mChart3 = new LineChart(this);
+        mChart3 = createGraph(mChart3, "HR");
+
+        mChart4 = new LineChart(this);
+        mChart4= createGraph(mChart4, "IBI");
+        //endregion
+
     }
+
+    public LineChart createGraph(LineChart mChart, String name){
+        mChart.setDescription(name);
+        mChart.setHighlightPerTapEnabled(true);
+        mChart.setTouchEnabled(true);
+        mChart.setDragEnabled(true);
+        mChart.setScaleEnabled(true);
+        mChart.setDrawGridBackground(true);
+
+        //enable pinch zoom to avoid scaling axis
+        mChart.setPinchZoom(true);
+        //colour background
+        mChart.setBackgroundColor(Color.GRAY);
+
+        LineData data_G1 = new LineData();
+        data_G1.setValueTextColor(Color.WHITE);
+        mChart.setData(data_G1);
+
+        Legend L1_G1 = mChart.getLegend();
+        L1_G1.setForm(Legend.LegendForm.LINE);
+        L1_G1.setTextColor(Color.BLACK);
+
+        XAxis x1_G1 = mChart.getXAxis();
+        x1_G1.setTextColor(Color.BLACK);
+        x1_G1.setDrawGridLines(true);
+        x1_G1.setAvoidFirstLastClipping(true);
+
+        YAxis y1_G1 = mChart.getAxisLeft();
+        y1_G1.setTextColor(Color.BLACK);
+        y1_G1.setDrawGridLines(true);
+        y1_G1.setAxisMaxValue(80);
+        y1_G1.setAxisMinValue(-50);
+
+        YAxis y1_2_G1 = mChart.getAxisRight();
+        y1_2_G1.setEnabled(false);
+
+        return mChart;
+    }
+
+    public LineDataSet createDataSet(String name)    {
+
+        LineDataSet graph_data = new LineDataSet(null,name);
+        graph_data.setDrawCubic(true); // sets drawing mode to cubic
+        graph_data.setCubicIntensity(0.2f);
+        graph_data.setAxisDependency(YAxis.AxisDependency.LEFT);
+        graph_data.setColor(ColorTemplate.getHoloBlue());//setting the line color theme to blue
+        graph_data.setCircleColor(ColorTemplate.getHoloBlue());// each plotting point color
+        graph_data.setLineWidth(1f);
+        graph_data.setFillAlpha(60);
+        graph_data.setFillColor(ColorTemplate.getHoloBlue());// fill of the line
+        graph_data.setHighLightColor(Color.rgb(244,177,177));
+        graph_data.setValueTextColor(Color.BLACK);
+        graph_data.setValueTextSize(7.5f);
+
+        return graph_data;
+    }
+
+    public LineChart updateGraph(float val, LineChart mChart, String name){
+        LineData data = mChart.getData();
+        if (data != null)
+        {
+            LineDataSet set = (LineDataSet) data.getDataSetByIndex(0);
+
+            if(set == null) {
+                // creation of data set if there is not data
+                set = createDataSet(name);
+                data.addDataSet(set);
+            }
+
+            if(name == "HR"){
+                if(hrData <=59)
+                {
+                    data.addXValue("");
+                    data.addEntry(new Entry(60, set.getEntryCount()), 0);
+                }
+                else {
+                    data.addXValue("");
+                    data.addEntry(new Entry(hrData, set.getEntryCount()), 0);
+                }
+            }else{
+                // adding x value to the data set
+                data.addXValue("");
+                //adding new x value to the data set
+                data.addEntry(new Entry(val,set.getEntryCount()),0);
+            }
+            //notify chart data has changed
+            mChart.notifyDataSetChanged();
+            mChart.setVisibleXRange(1,20);
+            mChart.moveViewToX(data.getXValCount() - 5);
+        }
+
+        return mChart;
+
+    }
+
 
     @Override
     public void onBackPressed() {
@@ -162,202 +275,484 @@ public class MainActivity extends AppCompatActivity
         return true;
     }
 
+    /**
+     * A placeholder fragment containing a simple view.
+     */
+    public static class PlaceholderFragment extends Fragment
+            implements EmpaDataDelegate, EmpaStatusDelegate {
+        /**
+         * The fragment argument representing the section number for this
+         * fragment.
+         */
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        switch (requestCode) {
-            case REQUEST_PERMISSION_ACCESS_COARSE_LOCATION:
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // Permission was granted, yay!
-                    initEmpaticaDeviceManager();
-                } else {
-                    // Permission denied, boo!
-                    final boolean needRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION);
-                    new AlertDialog.Builder(this)
-                            .setTitle("Permission required")
-                            .setMessage("Without this permission bluetooth low energy devices cannot be found, allow it in order to connect to the device.")
-                            .setPositiveButton("Retry", new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int which) {
-                                    // try again
-                                    if (needRationale) {
-                                        // the "never ask again" flash is not set, try again with permission request
-                                        initEmpaticaDeviceManager();
-                                    } else {
-                                        // the "never ask again" flag is set so the permission requests is disabled, try open app settings to enable the permission
-                                        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                                        Uri uri = Uri.fromParts("package", getPackageName(), null);
-                                        intent.setData(uri);
-                                        startActivity(intent);
+        private static final int REQUEST_ENABLE_BT = 1;
+        private static final int REQUEST_PERMISSION_ACCESS_COARSE_LOCATION = 1;
+
+        private static final long STREAMING_TIME = 100000; // Stops streaming 10 seconds after connection
+
+        private static final String EMPATICA_API_KEY = "1482f602113740c0aac7310e724e3a92"; // TODO insert your API Key here
+
+        private EmpaDeviceManager deviceManager = null;
+
+        private TextView accel_xLabel;
+        private TextView accel_yLabel;
+        private TextView accel_zLabel;
+        private TextView bvpLabel;
+        private TextView edaLabel;
+        private TextView ibiLabel;
+        private TextView temperatureLabel;
+        private TextView batteryLabel;
+        private TextView statusLabel;
+        private TextView deviceNameLabel;
+        private RelativeLayout dataCnt;
+        public PlaceholderFragment() {
+        }
+
+        /**
+         * Returns a new instance of this fragment for the given section
+         * number.
+         */
+        public static PlaceholderFragment newInstance(int sectionNumber) {
+            PlaceholderFragment fragment = new PlaceholderFragment();
+            Bundle args = new Bundle();
+            return fragment;
+        }
+        @Override
+        public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+            switch (requestCode) {
+                case REQUEST_PERMISSION_ACCESS_COARSE_LOCATION:
+                    // If request is cancelled, the result arrays are empty.
+                    if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                        // Permission was granted, yay!
+                        initEmpaticaDeviceManager();
+                    } else {
+                        // Permission denied, boo!
+                        final boolean needRationale = ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), Manifest.permission.ACCESS_COARSE_LOCATION);
+                        new AlertDialog.Builder(getActivity())
+                                .setTitle("Permission required")
+                                .setMessage("Without this permission bluetooth low energy devices cannot be found, allow it in order to connect to the device.")
+                                .setPositiveButton("Retry", new DialogInterface.OnClickListener() {
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        // try again
+                                        if (needRationale) {
+                                            // the "never ask again" flash is not set, try again with permission request
+                                            initEmpaticaDeviceManager();
+                                        } else {
+                                            // the "never ask again" flag is set so the permission requests is disabled, try open app settings to enable the permission
+                                            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                            Uri uri = Uri.fromParts("package", getActivity().getPackageName(), null);
+                                            intent.setData(uri);
+                                            startActivity(intent);
+                                        }
                                     }
-                                }
-                            })
-                            .setNegativeButton("Exit application", new DialogInterface.OnClickListener() {
+                                })
+                                .setNegativeButton("Exit application", new DialogInterface.OnClickListener() {
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        // without permission exit is the only way
+                                        getActivity().finish();
+                                    }
+                                })
+                                .show();
+                    }
+                    break;
+            }
+        }
+
+        private void initEmpaticaDeviceManager() {
+            // Android 6 (API level 23) now require ACCESS_COARSE_LOCATION permission to use BLE
+            if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(getActivity(), new String[] { Manifest.permission.ACCESS_COARSE_LOCATION }, REQUEST_PERMISSION_ACCESS_COARSE_LOCATION);
+            } else {
+                // Create a new EmpaDeviceManager. MainActivity is both its data and status delegate.
+                deviceManager = new EmpaDeviceManager(getActivity().getApplicationContext(), this, this);
+
+                if (TextUtils.isEmpty(EMPATICA_API_KEY)) {
+                    new AlertDialog.Builder(getActivity())
+                            .setTitle("Warning")
+                            .setMessage("Please insert your API KEY")
+                            .setNegativeButton("Close", new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     // without permission exit is the only way
-                                    finish();
+                                    getActivity().finish();
                                 }
                             })
                             .show();
+                    return;
                 }
-                break;
+                // Initialize the Device Manager using your API key. You need to have Internet access at this point.
+                deviceManager.authenticateWithAPIKey(EMPATICA_API_KEY);
+            }
         }
-    }
 
-    private void initEmpaticaDeviceManager() {
-        // Android 6 (API level 23) now require ACCESS_COARSE_LOCATION permission to use BLE
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[] { Manifest.permission.ACCESS_COARSE_LOCATION }, REQUEST_PERMISSION_ACCESS_COARSE_LOCATION);
-        } else {
-            // Create a new EmpaDeviceManager. MainActivity is both its data and status delegate.
-            deviceManager = new EmpaDeviceManager(getApplicationContext(), this, this);
+        @Override
+        public void onPause() {
+            super.onPause();
+            if (deviceManager != null) {
+                deviceManager.stopScanning();
+            }
+        }
 
-            if (TextUtils.isEmpty(EMPATICA_API_KEY)) {
-                new AlertDialog.Builder(this)
-                        .setTitle("Warning")
-                        .setMessage("Please insert your API KEY")
-                        .setNegativeButton("Close", new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                // without permission exit is the only way
-                                finish();
-                            }
-                        })
-                        .show();
+        @Override
+        public void onDestroy() {
+            super.onDestroy();
+            if (deviceManager != null) {
+                deviceManager.cleanUp();
+            }
+        }
+
+        @Override
+        public void didDiscoverDevice(BluetoothDevice bluetoothDevice, String deviceName, int rssi, boolean allowed) {
+            // Check if the discovered device can be used with your API key. If allowed is always false,
+            // the device is not linked with your API key. Please check your developer area at
+            // https://www.empatica.com/connect/developer.php
+            if (allowed) {
+                // Stop scanning. The first allowed device will do.
+                deviceManager.stopScanning();
+                try {
+                    // Connect to the device
+                    deviceManager.connectDevice(bluetoothDevice);
+                    updateLabel(deviceNameLabel, "To: " + deviceName);
+                } catch (ConnectionNotAllowedException e) {
+                    // This should happen only if you try to connect when allowed == false.
+                    Toast.makeText(getActivity(), "Sorry, you can't connect to this device", Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+
+        @Override
+        public void didRequestEnableBluetooth() {
+            // Request the user to enable Bluetooth
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+        }
+
+        @Override
+        public void onActivityResult(int requestCode, int resultCode, Intent data) {
+            // The user chose not to enable Bluetooth
+            if (requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_CANCELED) {
+                // You should deal with this
                 return;
             }
-            // Initialize the Device Manager using your API key. You need to have Internet access at this point.
-            deviceManager.authenticateWithAPIKey(EMPATICA_API_KEY);
+            super.onActivityResult(requestCode, resultCode, data);
         }
-    }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (deviceManager != null) {
-            deviceManager.stopScanning();
+        @Override
+        public void didUpdateSensorStatus(EmpaSensorStatus status, EmpaSensorType type) {
+            // No need to implement this right now
         }
-    }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (deviceManager != null) {
-            deviceManager.cleanUp();
-        }
-    }
+        @Override
+        public void didUpdateStatus(EmpaStatus status) {
+            // Update the UI
+            updateLabel(statusLabel, status.name());
 
-    @Override
-    public void didDiscoverDevice(BluetoothDevice bluetoothDevice, String deviceName, int rssi, boolean allowed) {
-        // Check if the discovered device can be used with your API key. If allowed is always false,
-        // the device is not linked with your API key. Please check your developer area at
-        // https://www.empatica.com/connect/developer.php
-        if (allowed) {
-            // Stop scanning. The first allowed device will do.
-            deviceManager.stopScanning();
-            try {
-                // Connect to the device
-                deviceManager.connectDevice(bluetoothDevice);
-                updateLabel(deviceNameLabel, "To: " + deviceName);
-            } catch (ConnectionNotAllowedException e) {
-                // This should happen only if you try to connect when allowed == false.
-                Toast.makeText(MainActivity.this, "Sorry, you can't connect to this device", Toast.LENGTH_SHORT).show();
+            // The device manager is ready for use
+            if (status == EmpaStatus.READY) {
+                updateLabel(statusLabel, status.name() + " - Turn on your device");
+                // Start scanning
+                deviceManager.startScanning();
+                // The device manager has established a connection
+            } else if (status == EmpaStatus.CONNECTED) {
+                // Stop streaming after STREAMING_TIME
+                getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        dataCnt.setVisibility(View.VISIBLE);
+                        new Handler().postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                // Disconnect device
+                                deviceManager.disconnect();
+                            }
+                        }, STREAMING_TIME);
+                    }
+                });
+                // The device manager disconnected from a device
+            } else if (status == EmpaStatus.DISCONNECTED) {
+                updateLabel(deviceNameLabel, "");
             }
         }
-    }
 
-    @Override
-    public void didRequestEnableBluetooth() {
-        // Request the user to enable Bluetooth
-        Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-        startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        // The user chose not to enable Bluetooth
-        if (requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_CANCELED) {
-            // You should deal with this
-            return;
+        @Override
+        public void didReceiveAcceleration(int x, int y, int z, double timestamp) {
+            updateLabel(accel_xLabel, "" + x);
+            updateLabel(accel_yLabel, "" + y);
+            updateLabel(accel_zLabel, "" + z);
         }
-        super.onActivityResult(requestCode, resultCode, data);
-    }
 
-    @Override
-    public void didUpdateSensorStatus(EmpaSensorStatus status, EmpaSensorType type) {
-        // No need to implement this right now
-    }
+        @Override
+        public void didReceiveBVP(float bvp, double timestamp) {
+            updateLabel(bvpLabel, "" + bvp);
 
-    @Override
-    public void didUpdateStatus(EmpaStatus status) {
-        // Update the UI
-        updateLabel(statusLabel, status.name());
+            ((MainActivity)getActivity()).updateGraph(bvp, ((MainActivity)getActivity()).mChart1, "BVP");
+            ((MainActivity)getActivity()).updateGraph(bvp, ((MainActivity)getActivity()).mChart3, "HR");
+        }
 
-        // The device manager is ready for use
-        if (status == EmpaStatus.READY) {
-            updateLabel(statusLabel, status.name() + " - Turn on your device");
-            // Start scanning
-            deviceManager.startScanning();
-            // The device manager has established a connection
-        } else if (status == EmpaStatus.CONNECTED) {
-            // Stop streaming after STREAMING_TIME
-            runOnUiThread(new Runnable() {
+        @Override
+        public void didReceiveBatteryLevel(float battery, double timestamp) {
+            updateLabel(batteryLabel, String.format("%.0f %%", battery * 100));
+        }
+
+        @Override
+        public void didReceiveGSR(float gsr, double timestamp) {
+            updateLabel(edaLabel, "" + gsr);
+            ((MainActivity)getActivity()).updateGraph(gsr, ((MainActivity)getActivity()).mChart2, "EDA");
+        }
+
+        @Override
+        public void didReceiveIBI(float ibi, double timestamp) {
+            updateLabel(ibiLabel, "" + ibi);
+            ((MainActivity)getActivity()).updateGraph(ibi, ((MainActivity)getActivity()).mChart4, "EDA");
+            ((MainActivity)getActivity()).hrData = ((1/ibi)*60);
+
+        }
+
+        @Override
+        public void didReceiveTemperature(float temp, double timestamp) {
+            updateLabel(temperatureLabel, "" + temp);
+        }
+
+        // Update a label with some text, making sure this is run in the UI thread
+        private void updateLabel(final TextView label, final String text) {
+            getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    dataCnt.setVisibility(View.VISIBLE);
-                    new Handler().postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            // Disconnect device
-                            deviceManager.disconnect();
-                        }
-                    }, STREAMING_TIME);
+                    label.setText(text);
                 }
             });
-            // The device manager disconnected from a device
-        } else if (status == EmpaStatus.DISCONNECTED) {
-            updateLabel(deviceNameLabel, "");
+        }
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                                 Bundle savedInstanceState) {
+            View rootView = inflater.inflate(R.layout.content_main, container, false);
+            // Initialize vars that reference UI components
+            statusLabel = (TextView) rootView.findViewById(R.id.status);
+            dataCnt = (RelativeLayout) rootView.findViewById(R.id.dataArea);
+            accel_xLabel = (TextView) rootView.findViewById(R.id.accel_x);
+            accel_yLabel = (TextView) rootView.findViewById(R.id.accel_y);
+            accel_zLabel = (TextView) rootView.findViewById(R.id.accel_z);
+            bvpLabel = (TextView) rootView.findViewById(R.id.bvp);
+            edaLabel = (TextView) rootView.findViewById(R.id.eda);
+            ibiLabel = (TextView) rootView.findViewById(R.id.ibi);
+            temperatureLabel = (TextView) rootView.findViewById(R.id.temperature);
+            batteryLabel = (TextView) rootView.findViewById(R.id.battery);
+            deviceNameLabel = (TextView) rootView.findViewById(R.id.deviceName);
+
+            initEmpaticaDeviceManager();
+//            TextView textView = (TextView) rootView.findViewById(R.id.section_label);
+//            textView.setText(getString(R.string.section_format, getArguments().getInt(ARG_SECTION_NUMBER)));
+            return rootView;
         }
     }
 
-    @Override
-    public void didReceiveAcceleration(int x, int y, int z, double timestamp) {
-        updateLabel(accel_xLabel, "" + x);
-        updateLabel(accel_yLabel, "" + y);
-        updateLabel(accel_zLabel, "" + z);
+    public static class BVPGraph extends Fragment {
+        /**
+         * The fragment argument representing the section number for this
+         * fragment.
+         */
+        ;
+
+        public BVPGraph() {
+
+
+        }
+        /**
+         * Returns a new instance of this fragment for the given section
+         * number.
+         */
+        public static BVPGraph newInstance(int sectionNumber) {
+            BVPGraph fragment = new BVPGraph();
+            return fragment;
+        }
+
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                                 Bundle savedInstanceState) {
+            View rootView = inflater.inflate(R.layout.graphs, container, false);
+            // get a layout defined in xml
+            RelativeLayout rl = (RelativeLayout) rootView.findViewById(R.id.graph);
+
+            ((MainActivity)getActivity()).mChart1.setLayoutParams(new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT));
+
+            rl.addView(((MainActivity)getActivity()).mChart1);
+
+            return rootView;
+        }
+
+        @Override
+        public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+            super.onActivityCreated(savedInstanceState);
+
+
+        }
     }
 
-    @Override
-    public void didReceiveBVP(float bvp, double timestamp) {
-        updateLabel(bvpLabel, "" + bvp);
+    public static class EDAGraph extends Fragment {
+        /**
+         * The fragment argument representing the section number for this
+         * fragment.
+         */
+        ;
+
+        public EDAGraph() {
+        }
+
+        /**
+         * Returns a new instance of this fragment for the given section
+         * number.
+         */
+        public static EDAGraph newInstance(int sectionNumber) {
+            EDAGraph fragment = new EDAGraph();
+            return fragment;
+        }
+
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                                 Bundle savedInstanceState) {
+
+            View rootView = inflater.inflate(R.layout.graphs, container, false);
+
+            // get a layout defined in xml
+            RelativeLayout rl = (RelativeLayout) rootView.findViewById(R.id.graph);
+
+            ((MainActivity)getActivity()).mChart2.setLayoutParams(new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT));
+
+            rl.addView(((MainActivity)getActivity()).mChart2);
+
+
+            return rootView;
+        }
     }
 
-    @Override
-    public void didReceiveBatteryLevel(float battery, double timestamp) {
-        updateLabel(batteryLabel, String.format("%.0f %%", battery * 100));
+    public static class HRGraph extends Fragment {
+        /**
+         * The fragment argument representing the section number for this
+         * fragment.
+         */
+        ;
+        private LineChart mChart3;
+        public HRGraph() {
+        }
+
+        public static HRGraph newInstance(int sectionNumber) {
+            HRGraph fragment = new HRGraph();
+            return fragment;
+        }
+
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                                 Bundle savedInstanceState) {
+
+            View rootView = inflater.inflate(R.layout.graphs, container, false);
+
+            // get a layout defined in xml
+            RelativeLayout rl = (RelativeLayout) rootView.findViewById(R.id.graph);
+
+            ((MainActivity)getActivity()).mChart3.setLayoutParams(new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT));
+
+            rl.addView(((MainActivity)getActivity()).mChart3);
+
+
+            return rootView;
+        }
     }
 
-    @Override
-    public void didReceiveGSR(float gsr, double timestamp) {
-        updateLabel(edaLabel, "" + gsr);
+    public static class IBIGraph extends Fragment {
+        /**
+         * The fragment argument representing the section number for this
+         * fragment.
+         */
+        ;
+
+        public IBIGraph() {
+        }
+
+        /**
+         * Returns a new instance of this fragment for the given section
+         * number.
+         */
+        public static IBIGraph newInstance(int sectionNumber) {
+            IBIGraph fragment = new IBIGraph();
+            return fragment;
+        }
+
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                                 Bundle savedInstanceState) {
+
+            View rootView = inflater.inflate(R.layout.graphs, container, false);
+
+            // get a layout defined in xml
+            RelativeLayout rl = (RelativeLayout) rootView.findViewById(R.id.graph);
+
+            ((MainActivity)getActivity()).mChart4.setLayoutParams(new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT));
+
+            rl.addView(((MainActivity)getActivity()).mChart4);
+
+
+            return rootView;
+        }
     }
 
-    @Override
-    public void didReceiveIBI(float ibi, double timestamp) {
-        updateLabel(ibiLabel, "" + ibi);
-    }
+    /**
+     * A {@link FragmentPagerAdapter} that returns a fragment corresponding to
+     * one of the sections/tabs/pages.
+     */
+    public class SectionsPagerAdapter extends FragmentPagerAdapter {
 
-    @Override
-    public void didReceiveTemperature(float temp, double timestamp) {
-        updateLabel(temperatureLabel, "" + temp);
-    }
+        public SectionsPagerAdapter(FragmentManager fm) {
+            super(fm);
+        }
 
-    // Update a label with some text, making sure this is run in the UI thread
-    private void updateLabel(final TextView label, final String text) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                label.setText(text);
+        @Override
+        public Fragment getItem(int position) {
+            // getItem is called to instantiate the fragment for the given page.
+            Fragment fragment;
+            switch (position) {
+                case 0:
+                    fragment = PlaceholderFragment.newInstance(position + 1);
+                    break;
+                case 1:
+                    fragment = BVPGraph.newInstance(position + 1);
+                    break;
+                case 2:
+                    fragment = EDAGraph.newInstance(position + 1);
+                    break;
+                case 3:
+                    fragment = HRGraph.newInstance(position + 1);
+                    break;
+                case 4:
+                    fragment = IBIGraph.newInstance(position + 1);
+                    break;
+                default:
+                    fragment = PlaceholderFragment.newInstance(position + 1);
+                    break;
+
             }
-        });
+            return fragment;
+        }
+
+        @Override
+        public int getCount() {
+            // Show 5 total pages.
+            return 5;
+        }
+
+        @Override
+        public CharSequence getPageTitle(int position) {
+            switch (position) {
+                case 0:
+                    return "DATA";
+                case 1:
+                    return "BVP";
+                case 2:
+                    return "EDA";
+                case 3:
+                    return "HR";
+                case 4:
+                    return "IBI";
+            }
+            return null;
+        }
     }
 }
