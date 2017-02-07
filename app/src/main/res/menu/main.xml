@@ -6,4 +6,10 @@
         android:orderInCategory="100"
         android:title="@string/action_settings"
         app:showAsAction="never" />
+
+    <item
+        android:id="@+id/past_sessions"
+        android:orderInCategory="100"
+        android:title="@string/past_sessions"
+        app:showAsAction="never" />
 </menu>

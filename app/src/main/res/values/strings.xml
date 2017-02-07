@@ -5,6 +5,7 @@
     <string name="navigation_drawer_close">Close navigation drawer</string>
 
     <string name="action_settings">Settings</string>
+    <string name="past_sessions">Past Sessions</string>
 
     <string name="accel">Accelerometers</string>
     <string name="accel_x">x:</string>

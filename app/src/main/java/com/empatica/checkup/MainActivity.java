@@ -10,6 +10,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
@@ -24,6 +25,7 @@ import android.support.v4.view.ViewPager;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -57,6 +59,19 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.poifs.filesystem.POIFSFileSystem;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellUtil;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener  {
@@ -71,7 +86,7 @@ public class MainActivity extends AppCompatActivity
     public LineChart mChart4;
 
     private float hrData =0;
-
+    public File dirFile = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,8 +134,172 @@ public class MainActivity extends AppCompatActivity
 
         mChart4 = new LineChart(this);
         mChart4= createGraph(mChart4, "IBI");
+
+        String s = getIntent().getStringExtra("LOAD");
+
+        if(s!=null){
+            File myFile = new File(s);
+            Log.d("test","s");
+            Log.d("test",String.valueOf(myFile));
+            loadSession(myFile);
+        }
+
         //endregion
 
+    }
+
+    public void saveSession(int n, float val){
+        String folder_main = "CheckUp";
+
+        File dir = new File(Environment.getExternalStorageDirectory(), folder_main);
+
+        if (!dir.exists()) {
+            dir.mkdir();
+        }
+
+        File myFile = new File(dir, "Session1.xls");
+        if (dir.list().length>0 && n!=0) {
+            myFile = dirFile;
+        }
+
+        if (n==0) {
+//            FileInputStream fin = null;
+            FileOutputStream fos = null;
+            if (dir.list().length==0) {
+                myFile = new File(dir, "Session1.xls");
+            }else if (dir.list().length!=0){
+                myFile = new File(dir, "Session" + String.valueOf(dir.list().length+1) + ".xls");
+            }
+
+//            try {
+////                fin = new FileInputStream(myFile);
+//            }catch(IOException e){
+//                System.out.println("fileinput"+e);
+//            }
+            dirFile = myFile;
+
+            try{
+                Workbook wb = new HSSFWorkbook();
+
+                Sheet bvp_sheet = wb.createSheet("BVP");
+                Row bvp_row = bvp_sheet.createRow(0);
+                Cell bvp_cell = bvp_row.createCell(0);
+
+                Sheet eda_sheet = wb.createSheet("EDA");
+                Row eda_row = eda_sheet.createRow(0);
+                Cell eda_cell = eda_row.createCell(0);
+
+                Sheet hr_sheet = wb.createSheet("Heart Rate");
+                Row hr_row = hr_sheet.createRow(0);
+                Cell hr_cell = hr_row.createCell(0);
+
+                Sheet ibi_sheet = wb.createSheet("IBI");
+                Row ibi_row = ibi_sheet.createRow(0);
+                Cell ibi_cell = ibi_row.createCell(0);
+//                fin.close();
+                fos = new FileOutputStream(myFile);
+                wb.write(fos);
+                fos.close();
+            }catch (IOException e){
+                System.out.println("wb io" + e);
+//            }catch (InvalidFormatException i){
+//                System.out.println("wb invformat"+i);
+            }finally{
+//                org.apache.commons.io.IOUtils.closeQuietly(fin);
+                org.apache.commons.io.IOUtils.closeQuietly(fos);
+            }
+
+        }
+        if (n!=0) {
+            FileInputStream fin = null;
+            FileOutputStream fos = null;
+            try {
+                fin=new FileInputStream(myFile);
+                // Create a POIFSFileSystem object
+                POIFSFileSystem myFileSystem = new POIFSFileSystem(fin);
+
+                // Create a workbook using the File System
+                HSSFWorkbook wb = new HSSFWorkbook(myFileSystem);
+                if(n==1){
+                    int v=0;
+                    Sheet sheet = wb.getSheetAt(0);
+                    if((sheet.getPhysicalNumberOfRows()%65536==0)&&(sheet.getPhysicalNumberOfRows()!=0)){
+                        v=sheet.getPhysicalNumberOfRows()/65536;
+                    }
+                    if (sheet.getPhysicalNumberOfRows()==0){
+                        Row row = sheet.createRow(0);
+                        Cell cell = row.createCell(0)
+                                ;
+                        cell.setCellValue(val);
+                    }else{
+                        Row row = sheet.createRow(sheet.getLastRowNum()+1);
+                        Cell cell = row.createCell(v);
+                        cell.setCellValue(val);
+                    }
+
+                }
+                if(n==2){
+                    int v=0;
+                    Sheet sheet = wb.getSheetAt(1);
+                    if((sheet.getPhysicalNumberOfRows()%65536==0)&&(sheet.getPhysicalNumberOfRows()!=0)){
+                        v=sheet.getPhysicalNumberOfRows()/65536;
+                    }
+                    if (sheet.getPhysicalNumberOfRows()==0){
+                        Row row = sheet.createRow(0);
+                        Cell cell = row.createCell(0);
+                        cell.setCellValue(val);
+                    }else{
+                        Row row = sheet.createRow(sheet.getLastRowNum()+1);
+                        Cell cell = row.createCell(v);
+                        cell.setCellValue(val);
+                    }
+                }
+                if(n==3){
+                    int v=0;
+                    Sheet sheet = wb.getSheetAt(2);
+                    if((sheet.getPhysicalNumberOfRows()%65536==0)&&(sheet.getPhysicalNumberOfRows()!=0)){
+                        v=sheet.getPhysicalNumberOfRows()/65536;
+                    }
+                    if (sheet.getPhysicalNumberOfRows()==0){
+                        Row row = sheet.createRow(0);
+                        Cell cell = row.createCell(0);
+                        cell.setCellValue(val);
+                    }else{
+                        Row row = sheet.createRow(sheet.getLastRowNum()+1);
+                        Cell cell = row.createCell(v);
+                        cell.setCellValue(val);
+                    }
+                }
+                if(n==4){
+                    int v=0;
+                    Sheet sheet = wb.getSheetAt(3);
+                    if((sheet.getPhysicalNumberOfRows()%65536==0)&&(sheet.getPhysicalNumberOfRows()!=0)){
+                        v=sheet.getPhysicalNumberOfRows()/65536;
+                    }
+                    if (sheet.getPhysicalNumberOfRows()==0){
+                        Row row = sheet.createRow(0);
+                        Cell cell = row.createCell(0);
+                        cell.setCellValue(val);
+                    }else{
+                        Row row = sheet.createRow(sheet.getLastRowNum()+1);
+                        Cell cell = row.createCell(v);
+                        cell.setCellValue(val);
+                    }
+                }
+                fin.close();
+                fos = new FileOutputStream(myFile);
+                wb.write(fos);
+                fos.close();
+
+            }catch (IOException e){
+                System.out.println(e);
+//            }catch (InvalidFormatException i){
+//                System.out.println(i);
+            }finally {
+                org.apache.commons.io.IOUtils.closeQuietly(fin);
+                org.apache.commons.io.IOUtils.closeQuietly(fos);
+            }
+        }
     }
 
     public LineChart createGraph(LineChart mChart, String name){
@@ -217,6 +396,43 @@ public class MainActivity extends AppCompatActivity
 
     }
 
+    public void loadSession(File myFile) {
+        FileInputStream fin = null;
+        FileOutputStream fos = null;
+        try {
+            fin = new FileInputStream(myFile);
+            // Create a POIFSFileSystem object
+            POIFSFileSystem myFileSystem = new POIFSFileSystem(fin);
+
+            // Create a workbook using the File System
+            HSSFWorkbook wb = new HSSFWorkbook(myFileSystem);
+            int columnIndex = 0;
+
+            for(int n=0; n<=3; n++) {
+                Sheet sheet = wb.getSheetAt(n);
+                for (int rowIndex = 0; rowIndex<sheet.getPhysicalNumberOfRows(); rowIndex++){
+                    Row row = CellUtil.getRow(rowIndex, sheet);
+                    Cell cell = CellUtil.getCell(row, columnIndex);
+                    if (n == 0) {
+                        updateGraph((float) cell.getNumericCellValue(), mChart1, "BVP");
+                    }else if (n == 1) {
+                        updateGraph((float) cell.getNumericCellValue(), mChart2, "EDA");
+                    }else if (n == 2) {
+                        updateGraph((float) cell.getNumericCellValue(), mChart3, "HR");
+                    }else if (n == 3) {
+                        updateGraph((float) cell.getNumericCellValue(), mChart4, "IBI");
+                    }
+                }
+            }
+        } catch (IOException e){
+            System.out.println(e);
+//            }catch (InvalidFormatException i){
+//                System.out.println(i);
+        } finally {
+            org.apache.commons.io.IOUtils.closeQuietly(fin);
+            org.apache.commons.io.IOUtils.closeQuietly(fos);
+        }
+    }
 
     @Override
     public void onBackPressed() {
@@ -244,6 +460,11 @@ public class MainActivity extends AppCompatActivity
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            return true;
+        }
+
+        if (id == R.id.past_sessions) {
+            startActivity (new Intent (this, PastSessions.class));
             return true;
         }
 
@@ -454,6 +675,7 @@ public class MainActivity extends AppCompatActivity
                 // The device manager has established a connection
             } else if (status == EmpaStatus.CONNECTED) {
                 // Stop streaming after STREAMING_TIME
+                ((MainActivity)getActivity()).saveSession(0,0);
                 getActivity().runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -483,7 +705,7 @@ public class MainActivity extends AppCompatActivity
         @Override
         public void didReceiveBVP(float bvp, double timestamp) {
             updateLabel(bvpLabel, "" + bvp);
-
+            ((MainActivity)getActivity()).saveSession(1,bvp);
             ((MainActivity)getActivity()).updateGraph(bvp, ((MainActivity)getActivity()).mChart1, "BVP");
             ((MainActivity)getActivity()).updateGraph(bvp, ((MainActivity)getActivity()).mChart3, "HR");
         }
@@ -496,14 +718,17 @@ public class MainActivity extends AppCompatActivity
         @Override
         public void didReceiveGSR(float gsr, double timestamp) {
             updateLabel(edaLabel, "" + gsr);
+            ((MainActivity)getActivity()).saveSession(2,gsr);
             ((MainActivity)getActivity()).updateGraph(gsr, ((MainActivity)getActivity()).mChart2, "EDA");
         }
 
         @Override
         public void didReceiveIBI(float ibi, double timestamp) {
             updateLabel(ibiLabel, "" + ibi);
+            ((MainActivity)getActivity()).saveSession(4,ibi);
             ((MainActivity)getActivity()).updateGraph(ibi, ((MainActivity)getActivity()).mChart4, "EDA");
             ((MainActivity)getActivity()).hrData = ((1/ibi)*60);
+            ((MainActivity)getActivity()).saveSession(3,((MainActivity)getActivity()).hrData);
 
         }
 
